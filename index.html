@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="hi-IN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0F172A" />
+  <title>KaamBatao — Jo samajh nahi aaye, uski photo bhejo</title>
+  <meta name="description" content="Koi bhi document, screenshot ya form samajh nahi aa raha? KaamBatao par photo bhejein aur AI se simple bhasha mein samjhein." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <div class="app-shell">
+
+    <!-- ============ HEADER (persistent) ============ -->
+    <header class="app-header">
+      <div class="brand" id="brandHome">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="24" height="24" rx="7" fill="url(#g1)"/>
+            <path d="M7 12.5L10.2 15.7L17 8" stroke="white" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#6366F1"/>
+                <stop offset="1" stop-color="#22D3EE"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </span>
+        <span class="brand-name">Kaam<span class="brand-accent">Batao</span></span>
+      </div>
+    </header>
+
+    <!-- ============ MAIN ============ -->
+    <main class="screens">
+
+      <!-- ---------- SCREEN 1: HOME ---------- -->
+      <section class="screen active" id="screen-home" aria-labelledby="home-title">
+        <div class="hero">
+          <h1 id="home-title" class="hero-title">Jo samajh nahi aaye,<br/>uski photo bhejo.</h1>
+          <p class="hero-sub">Bill, notice, form ya koi bhi confusing document — KaamBatao aapko 10 second mein simple bhasha mein samjha dega.</p>
+        </div>
+
+        <div class="cta-group">
+          <button class="btn btn-primary btn-lg" id="btnUploadPhoto" type="button">
+            <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 16.5V7.5C4 6.67 4.67 6 5.5 6H8L9.2 4.3C9.4 4.02 9.72 3.85 10.06 3.85H13.94C14.28 3.85 14.6 4.02 14.8 4.3L16 6H18.5C19.33 6 20 6.67 20 7.5V16.5C20 17.33 19.33 18 18.5 18H5.5C4.67 18 4 17.33 4 16.5Z" stroke="white" stroke-width="1.7"/><circle cx="12" cy="12" r="3.2" stroke="white" stroke-width="1.7"/></svg>
+            Photo Upload Karein
+          </button>
+          <button class="btn btn-secondary btn-lg" id="btnCamera" type="button">
+            <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 16.5V7.5C4 6.67 4.67 6 5.5 6H8L9.2 4.3C9.4 4.02 9.72 3.85 10.06 3.85H13.94C14.28 3.85 14.6 4.02 14.8 4.3L16 6H18.5C19.33 6 20 6.67 20 7.5V16.5C20 17.33 19.33 18 18.5 18H5.5C4.67 18 4 17.33 4 16.5Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.7"/></svg>
+            Camera Se Kheenchein
+          </button>
+        </div>
+
+        <div class="how-it-works">
+          <h2 class="section-heading">Kaise kaam karta hai?</h2>
+          <ol class="steps-list">
+            <li class="step-item">
+              <span class="step-num">1</span>
+              <div>
+                <p class="step-title">Photo bhejein</p>
+                <p class="step-desc">Document, bill ya screenshot upload karein ya camera se kheenchein.</p>
+              </div>
+            </li>
+            <li class="step-item">
+              <span class="step-num">2</span>
+              <div>
+                <p class="step-title">AI samjhega</p>
+                <p class="step-desc">Hamara AI usse padh kar simple Hindi-English mein analyse karega.</p>
+              </div>
+            </li>
+            <li class="step-item">
+              <span class="step-num">3</span>
+              <div>
+                <p class="step-title">Aapko pata chalega</p>
+                <p class="step-desc">Kya hai, zaroori baatein, aur ab kya karna hai — ek checklist ke saath.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+
+        <p class="privacy-note">🔒 Aapki photo sirf analysis ke liye use hoti hai.</p>
+      </section>
+
+      <!-- ---------- SCREEN 2: UPLOAD ---------- -->
+      <section class="screen" id="screen-upload" aria-labelledby="upload-title">
+        <button class="back-btn" id="backFromUpload" type="button" aria-label="Wapas jaayein">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Wapas
+        </button>
+
+        <h2 id="upload-title" class="screen-title">Apna document chunein</h2>
+
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-empty" id="uploadEmptyState">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M12 4L7 9M12 4L17 9" stroke="#6366F1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16V17.5C4 18.88 5.12 20 6.5 20H17.5C18.88 20 20 18.88 20 17.5V16" stroke="#6366F1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <p class="upload-empty-text">Image select karein ya neeche se kheenchein</p>
+          </div>
+          <img id="previewImage" class="preview-image hidden" alt="Selected document preview" />
+        </div>
+
+        <input type="file" id="fileInputGallery" accept="image/*" class="visually-hidden" />
+        <input type="file" id="fileInputCamera" accept="image/*" capture="environment" class="visually-hidden" />
+
+        <div class="upload-actions" id="uploadPickButtons">
+          <button class="btn btn-outline" id="pickFromGallery" type="button">🖼️ Gallery Se Chunein</button>
+          <button class="btn btn-outline" id="pickFromCamera" type="button">📷 Camera Kholein</button>
+        </div>
+
+        <div class="upload-actions hidden" id="uploadPreviewButtons">
+          <button class="btn btn-ghost" id="removeImage" type="button">🗑️ Hataayein / Badlein</button>
+        </div>
+
+        <button class="btn btn-primary btn-lg btn-block" id="analyzeBtn" type="button" disabled>
+          Analyze Karein
+        </button>
+      </section>
+
+      <!-- ---------- SCREEN 3: ANALYSIS (LOADING) ---------- -->
+      <section class="screen" id="screen-analysis" aria-labelledby="analysis-title" aria-live="polite">
+        <div class="analysis-wrap">
+          <div class="loader-orb">
+            <div class="loader-ring"></div>
+            <div class="loader-ring loader-ring-2"></div>
+            <div class="loader-core"></div>
+          </div>
+          <h2 id="analysis-title" class="analysis-title">AI aapka document samajh raha hai...</h2>
+          <p class="analysis-sub" id="analysisSubtext">Thoda intezaar karein, ye kuch second lega.</p>
+        </div>
+      </section>
+
+      <!-- ---------- SCREEN 4: RESULT ---------- -->
+      <section class="screen" id="screen-result" aria-labelledby="result-title">
+        <h2 id="result-title" class="screen-title">Result</h2>
+
+        <div class="result-thumb-row" id="resultThumbRow">
+          <img id="resultThumb" class="result-thumb" alt="Analysed document" />
+          <span class="result-doctype" id="resultDocType"></span>
+        </div>
+
+        <div class="result-card">
+          <h3 class="result-heading">📄 Ye kya hai?</h3>
+          <p class="result-text" id="resultWhatIsIt">—</p>
+        </div>
+
+        <div class="result-card">
+          <h3 class="result-heading">📌 Important baatein</h3>
+          <ul class="result-list" id="resultImportantInfo"></ul>
+        </div>
+
+        <div class="result-card">
+          <h3 class="result-heading">➡️ Ab kya karein?</h3>
+          <ul class="result-list" id="resultNextSteps"></ul>
+        </div>
+
+        <div class="result-card">
+          <h3 class="result-heading">✅ Checklist</h3>
+          <ul class="checklist" id="resultChecklist"></ul>
+        </div>
+
+        <div id="resultError" class="error-box hidden"></div>
+
+        <div class="upload-actions result-actions">
+          <button class="btn btn-primary" id="shareBtn" type="button">📤 Share Result</button>
+          <button class="btn btn-outline" id="analyzeAnotherBtn" type="button">🔁 Analyze Another</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
