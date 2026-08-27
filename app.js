@@ -20,20 +20,16 @@
 // CONFIG
 // ============================================================
 const CONFIG = {
-  // Existing, working route (unchanged from KaamBatao).
-  ANALYZE_URL: "/api/analyze",
+  ANALYZE_URL: "https://kaambatao-backend.onrender.com/api/analyze",
 
-  // Not implemented on the backend yet. Each is a separate,
-  // clearly named endpoint so the real backend can be built
-  // feature-by-feature later without changing this frontend.
   ENDPOINTS: {
-    chat: "/api/chat",
-    search: "/api/search",
-    "image-gen": "/api/generate-image",
-    pdf: "/api/generate-pdf",
-    code: "/api/code",
-    "file-analysis": "/api/analyze-file",
-  },
+    chat: "https://kaambatao-backend.onrender.com/api/chat",
+    search: "https://kaambatao-backend.onrender.com/api/search",
+    "image-gen": "https://kaambatao-backend.onrender.com/api/generate-image",
+    pdf: "https://kaambatao-backend.onrender.com/api/generate-pdf",
+    code: "https://kaambatao-backend.onrender.com/api/code",
+    "file-analysis": "https://kaambatao-backend.onrender.com/api/analyze-file"
+  }
 };
 
 const MODE_LABELS = {
