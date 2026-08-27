@@ -1,30 +1,66 @@
 /**
- * KaamBatao — Frontend logic
+ * Tavunera — Frontend logic
  * -----------------------------------------------------------
- * This file ONLY handles UI + calls a backend API for analysis.
- * It never fabricates AI results — if the backend/API is not
- * configured, the user sees a clear error, not fake data.
+ * This file only handles UI + talks to backend endpoints. It
+ * never invents AI results. Today, only ONE backend route is
+ * real: POST /api/analyze (photo/document understanding —
+ * this is the same route KaamBatao used, kept working as-is).
+ *
+ * Every other capability (general chat, web search, image
+ * generation, PDF generation, code help, non-image file
+ * analysis) is wired to call a clearly-named backend endpoint
+ * that does not exist yet. When that call fails, the UI shows
+ * an honest "not connected yet" message instead of faking a
+ * response. Building each real backend route is future work —
+ * this file is just the ready-made frontend contract for it.
  * -----------------------------------------------------------
  */
 
 // ============================================================
-// CONFIG — change this when you deploy your backend somewhere
+// CONFIG
 // ============================================================
 const CONFIG = {
-  // During local development this can stay relative ("/api/analyze")
-  // if you're using a proxy. Once your backend is deployed
-  // (e.g. on Render/Railway), put its full URL here, e.g.:
-  // "https://kaambatao-backend.onrender.com/api/analyze"
-  API_URL: "/api/analyze",
+  // Existing, working route (unchanged from KaamBatao).
+  ANALYZE_URL: "/api/analyze",
+
+  // Not implemented on the backend yet. Each is a separate,
+  // clearly named endpoint so the real backend can be built
+  // feature-by-feature later without changing this frontend.
+  ENDPOINTS: {
+    chat: "/api/chat",
+    search: "/api/search",
+    "image-gen": "/api/generate-image",
+    pdf: "/api/generate-pdf",
+    code: "/api/code",
+    "file-analysis": "/api/analyze-file",
+  },
+};
+
+const MODE_LABELS = {
+  search: "🔎 Deep Search",
+  "image-gen": "🖼️ Create Image",
+  pdf: "📄 PDF",
+  code: "💻 Code",
+  "file-analysis": "📊 Analyze File",
+};
+
+const MODE_PLACEHOLDERS = {
+  search: "Kya research karna hai? e.g. 'Latest UPI rules 2026'",
+  "image-gen": "Kaisi image banani hai? e.g. 'Sunset over mountains, minimal style'",
+  pdf: "Kaunsa document banana hai? e.g. 'Rent agreement draft'",
+  code: "Coding mein kya madad chahiye? e.g. 'Is Python error ko fix karo'",
+  "file-analysis": "File attach karein aur bataayein kya jaanna hai",
 };
 
 // ============================================================
 // State
 // ============================================================
 const state = {
-  selectedFile: null,
-  previewDataUrl: null,
-  lastResult: null,
+  messages: [], // { id, role: 'user'|'ai', ...content }
+  attachedFile: null,
+  attachedPreviewUrl: null,
+  activeMode: null, // one of MODE_LABELS keys, or null = default chat/photo
+  hasEnteredChat: false,
 };
 
 // ============================================================
@@ -32,171 +68,270 @@ const state = {
 // ============================================================
 const el = {
   brandHome: document.getElementById("brandHome"),
+  chatHeaderActions: document.getElementById("chatHeaderActions"),
+  clearChatBtn: document.getElementById("clearChatBtn"),
+  newChatBtn: document.getElementById("newChatBtn"),
 
-  // Home
-  btnUploadPhoto: document.getElementById("btnUploadPhoto"),
-  btnCamera: document.getElementById("btnCamera"),
+  mainScroll: document.getElementById("mainScroll"),
+  viewHome: document.getElementById("view-home"),
+  viewChat: document.getElementById("view-chat"),
+  chatList: document.getElementById("chatList"),
+  quickActions: document.getElementById("quickActions"),
 
-  // Upload
-  backFromUpload: document.getElementById("backFromUpload"),
-  uploadZone: document.getElementById("uploadZone"),
-  uploadEmptyState: document.getElementById("uploadEmptyState"),
-  previewImage: document.getElementById("previewImage"),
-  fileInputGallery: document.getElementById("fileInputGallery"),
+  attachmentChip: document.getElementById("attachmentChip"),
+  attachmentThumb: document.getElementById("attachmentThumb"),
+  attachmentName: document.getElementById("attachmentName"),
+  attachmentRemove: document.getElementById("attachmentRemove"),
+
+  modeChip: document.getElementById("modeChip"),
+  modeChipLabel: document.getElementById("modeChipLabel"),
+  modeChipRemove: document.getElementById("modeChipRemove"),
+
+  composerInput: document.getElementById("composerInput"),
+  sendBtn: document.getElementById("sendBtn"),
+  attachFileBtn: document.getElementById("attachFileBtn"),
+  attachPhotoBtn: document.getElementById("attachPhotoBtn"),
+  attachCameraBtn: document.getElementById("attachCameraBtn"),
+
+  fileInputGeneric: document.getElementById("fileInputGeneric"),
+  fileInputPhoto: document.getElementById("fileInputPhoto"),
   fileInputCamera: document.getElementById("fileInputCamera"),
-  pickFromGallery: document.getElementById("pickFromGallery"),
-  pickFromCamera: document.getElementById("pickFromCamera"),
-  uploadPickButtons: document.getElementById("uploadPickButtons"),
-  uploadPreviewButtons: document.getElementById("uploadPreviewButtons"),
-  removeImage: document.getElementById("removeImage"),
-  analyzeBtn: document.getElementById("analyzeBtn"),
-
-  // Analysis
-  analysisSubtext: document.getElementById("analysisSubtext"),
-
-  // Result
-  resultThumb: document.getElementById("resultThumb"),
-  resultDocType: document.getElementById("resultDocType"),
-  resultWhatIsIt: document.getElementById("resultWhatIsIt"),
-  resultImportantInfo: document.getElementById("resultImportantInfo"),
-  resultNextSteps: document.getElementById("resultNextSteps"),
-  resultChecklist: document.getElementById("resultChecklist"),
-  resultError: document.getElementById("resultError"),
-  shareBtn: document.getElementById("shareBtn"),
-  analyzeAnotherBtn: document.getElementById("analyzeAnotherBtn"),
 
   toast: document.getElementById("toast"),
 };
 
 // ============================================================
-// Navigation
+// View switching (Home <-> Chat)
 // ============================================================
-function goToScreen(screenId) {
-  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-  document.getElementById(screenId).classList.add("active");
-  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+function showView(name) {
+  el.viewHome.classList.toggle("active", name === "home");
+  el.viewChat.classList.toggle("active", name === "chat");
+  el.chatHeaderActions.classList.toggle("hidden", name !== "chat");
 }
 
-el.brandHome.addEventListener("click", () => goToScreen("screen-home"));
-el.backFromUpload.addEventListener("click", () => goToScreen("screen-home"));
+function enterChatIfNeeded() {
+  if (!state.hasEnteredChat) {
+    state.hasEnteredChat = true;
+    showView("chat");
+  }
+}
 
-// ============================================================
-// Home -> Upload
-// ============================================================
-el.btnUploadPhoto.addEventListener("click", () => {
-  goToScreen("screen-upload");
+el.brandHome.addEventListener("click", goHome);
+el.newChatBtn.addEventListener("click", goHome);
+
+function goHome() {
+  state.messages = [];
+  state.hasEnteredChat = false;
+  clearAttachment();
+  clearMode();
+  el.composerInput.value = "";
+  autoResizeComposer();
+  updateSendButtonState();
+  el.chatList.innerHTML = "";
+  showView("home");
+}
+
+el.clearChatBtn.addEventListener("click", () => {
+  state.messages = [];
+  el.chatList.innerHTML = "";
 });
 
-el.btnCamera.addEventListener("click", () => {
-  goToScreen("screen-upload");
-  // Small delay so the screen transition finishes before the camera opens
-  setTimeout(() => el.fileInputCamera.click(), 200);
+// ============================================================
+// Quick action cards (Home)
+// ============================================================
+el.quickActions.addEventListener("click", (e) => {
+  const card = e.target.closest(".quick-card");
+  if (!card) return;
+  const mode = card.dataset.mode;
+  setMode(mode);
+  enterChatIfNeeded();
+  el.composerInput.focus();
+});
+
+function setMode(mode) {
+  state.activeMode = mode;
+  el.modeChipLabel.textContent = MODE_LABELS[mode] || mode;
+  el.modeChip.classList.remove("hidden");
+  el.composerInput.placeholder = MODE_PLACEHOLDERS[mode] || "Kuch bhi poochein...";
+}
+
+function clearMode() {
+  state.activeMode = null;
+  el.modeChip.classList.add("hidden");
+  el.composerInput.placeholder = "Kuch bhi poochein... ya photo bhejein";
+}
+
+el.modeChipRemove.addEventListener("click", clearMode);
+
+// ============================================================
+// Composer — text input
+// ============================================================
+el.composerInput.addEventListener("input", () => {
+  autoResizeComposer();
+  updateSendButtonState();
+});
+
+function autoResizeComposer() {
+  el.composerInput.style.height = "auto";
+  el.composerInput.style.height = Math.min(el.composerInput.scrollHeight, 120) + "px";
+}
+
+function updateSendButtonState() {
+  const hasText = el.composerInput.value.trim().length > 0;
+  el.sendBtn.disabled = !hasText && !state.attachedFile;
+}
+
+el.composerInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    if (!el.sendBtn.disabled) sendMessage();
+  }
 });
 
 // ============================================================
-// Upload screen — picking files
+// Composer — attachments
 // ============================================================
-el.pickFromGallery.addEventListener("click", () => el.fileInputGallery.click());
-el.pickFromCamera.addEventListener("click", () => el.fileInputCamera.click());
+el.attachFileBtn.addEventListener("click", () => el.fileInputGeneric.click());
+el.attachPhotoBtn.addEventListener("click", () => el.fileInputPhoto.click());
+el.attachCameraBtn.addEventListener("click", () => el.fileInputCamera.click());
 
-el.fileInputGallery.addEventListener("change", (e) => handleFileSelected(e.target.files[0]));
+el.fileInputGeneric.addEventListener("change", (e) => handleFileSelected(e.target.files[0]));
+el.fileInputPhoto.addEventListener("change", (e) => handleFileSelected(e.target.files[0]));
 el.fileInputCamera.addEventListener("change", (e) => handleFileSelected(e.target.files[0]));
 
 function handleFileSelected(file) {
   if (!file) return;
 
-  if (!file.type.startsWith("image/")) {
-    showToast("Sirf image file (photo/screenshot) select karein.");
-    return;
-  }
-
   const MAX_SIZE_MB = 10;
   if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-    showToast(`Image ${MAX_SIZE_MB}MB se choti honi chahiye.`);
+    showToast(`File ${MAX_SIZE_MB}MB se choti honi chahiye.`);
     return;
   }
 
-  state.selectedFile = file;
+  state.attachedFile = file;
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    state.previewDataUrl = e.target.result;
-    el.previewImage.src = state.previewDataUrl;
-    el.previewImage.classList.remove("hidden");
-    el.uploadEmptyState.classList.add("hidden");
-    el.uploadPickButtons.classList.add("hidden");
-    el.uploadPreviewButtons.classList.remove("hidden");
-    el.analyzeBtn.disabled = false;
-  };
-  reader.readAsDataURL(file);
+  if (file.type.startsWith("image/")) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      state.attachedPreviewUrl = e.target.result;
+      el.attachmentThumb.src = state.attachedPreviewUrl;
+      el.attachmentThumb.classList.remove("hidden");
+      el.attachmentName.textContent = file.name;
+      el.attachmentChip.classList.remove("hidden");
+    };
+    reader.readAsDataURL(file);
+  } else {
+    state.attachedPreviewUrl = null;
+    el.attachmentThumb.classList.add("hidden");
+    el.attachmentName.textContent = file.name;
+    el.attachmentChip.classList.remove("hidden");
+  }
+
+  updateSendButtonState();
 }
 
-el.removeImage.addEventListener("click", resetUpload);
+el.attachmentRemove.addEventListener("click", clearAttachment);
 
-function resetUpload() {
-  state.selectedFile = null;
-  state.previewDataUrl = null;
-  el.fileInputGallery.value = "";
+function clearAttachment() {
+  state.attachedFile = null;
+  state.attachedPreviewUrl = null;
+  el.fileInputGeneric.value = "";
+  el.fileInputPhoto.value = "";
   el.fileInputCamera.value = "";
-  el.previewImage.classList.add("hidden");
-  el.previewImage.src = "";
-  el.uploadEmptyState.classList.remove("hidden");
-  el.uploadPickButtons.classList.remove("hidden");
-  el.uploadPreviewButtons.classList.add("hidden");
-  el.analyzeBtn.disabled = true;
+  el.attachmentChip.classList.add("hidden");
+  el.attachmentThumb.src = "";
+  updateSendButtonState();
 }
 
 // ============================================================
-// Analyze
+// Sending a message
 // ============================================================
-el.analyzeBtn.addEventListener("click", analyzeDocument);
+el.sendBtn.addEventListener("click", sendMessage);
 
-const LOADING_MESSAGES = [
-  "AI aapka document samajh raha hai...",
-  "Zaroori jaankari dhoondh rahe hain...",
-  "Bas thoda intezaar aur...",
-];
+async function sendMessage() {
+  const text = el.composerInput.value.trim();
+  const file = state.attachedFile;
+  const filePreviewUrl = state.attachedPreviewUrl;
+  const mode = state.activeMode;
 
-async function analyzeDocument() {
-  if (!state.selectedFile) return;
+  if (!text && !file) return;
 
-  goToScreen("screen-analysis");
-  cycleLoadingMessages();
+  enterChatIfNeeded();
+
+  // Render the user's message bubble immediately
+  addMessage({
+    role: "user",
+    text,
+    fileName: file ? file.name : null,
+    fileIsImage: file ? file.type.startsWith("image/") : false,
+    filePreviewUrl,
+  });
+
+  // Reset composer for the next message
+  el.composerInput.value = "";
+  autoResizeComposer();
+  clearAttachment();
+  clearMode();
+  updateSendButtonState();
+
+  // Show typing indicator
+  const typingId = addTypingIndicator();
 
   try {
-    const formData = new FormData();
-    formData.append("image", state.selectedFile);
-
-    const response = await fetch(CONFIG.API_URL, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errBody = await safeJson(response);
-      throw new Error(errBody?.message || `Server error (${response.status})`);
+    if (file && file.type.startsWith("image/") && (!mode || mode === "file-analysis")) {
+      // Reuse the existing, working KaamBatao photo/document analysis route.
+      const result = await callAnalyzeApi(file);
+      removeTypingIndicator(typingId);
+      addMessage({ role: "ai", kind: "analysis", data: result });
+    } else {
+      // Every other capability: call its dedicated (not-yet-built) endpoint.
+      const routeMode = mode || "chat";
+      const result = await callFutureApi(routeMode, { text, file });
+      removeTypingIndicator(typingId);
+      addMessage({ role: "ai", kind: "text", text: result });
     }
-
-    const data = await response.json();
-    renderResult(data);
-    goToScreen("screen-result");
   } catch (err) {
-    renderResultError(err);
-    goToScreen("screen-result");
+    removeTypingIndicator(typingId);
+    addMessage({ role: "ai", kind: "error", text: err.message });
   }
 }
 
-function cycleLoadingMessages() {
-  let i = 0;
-  el.analysisSubtext.textContent = "Thoda intezaar karein, ye kuch second lega.";
-  const intervalId = setInterval(() => {
-    if (!document.getElementById("screen-analysis").classList.contains("active")) {
-      clearInterval(intervalId);
-      return;
-    }
-    i = (i + 1) % LOADING_MESSAGES.length;
-    document.getElementById("analysis-title").textContent = LOADING_MESSAGES[i];
-  }, 1800);
+// ============================================================
+// Backend calls
+// ============================================================
+async function callAnalyzeApi(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch(CONFIG.ANALYZE_URL, { method: "POST", body: formData });
+  const body = await safeJson(response);
+
+  if (!response.ok) {
+    throw new Error(body?.message || `Analysis abhi nahi ho paayi (${response.status}).`);
+  }
+  return body;
+}
+
+async function callFutureApi(mode, { text, file }) {
+  const url = CONFIG.ENDPOINTS[mode] || CONFIG.ENDPOINTS.chat;
+
+  const formData = new FormData();
+  if (text) formData.append("message", text);
+  if (file) formData.append("file", file);
+
+  let response;
+  try {
+    response = await fetch(url, { method: "POST", body: formData });
+  } catch {
+    throw new Error("Ye feature abhi backend se connect nahi hai. Jald hi add kiya jaayega.");
+  }
+
+  if (!response.ok) {
+    throw new Error("Ye feature abhi taiyaar nahi hai — backend jald connect hoga.");
+  }
+
+  const body = await safeJson(response);
+  return body?.reply || "—";
 }
 
 async function safeJson(response) {
@@ -208,119 +343,144 @@ async function safeJson(response) {
 }
 
 // ============================================================
-// Render result screen
+// Rendering messages
 // ============================================================
-function renderResult(data) {
-  state.lastResult = data;
+let msgCounter = 0;
 
-  el.resultError.classList.add("hidden");
-  el.resultError.textContent = "";
+function addMessage(msg) {
+  const id = `msg-${++msgCounter}`;
+  state.messages.push({ id, ...msg });
 
-  el.resultThumb.src = state.previewDataUrl || "";
-  el.resultDocType.textContent = data.documentType || "Document";
-  el.resultWhatIsIt.textContent = data.whatIsIt || "—";
+  const row = document.createElement("div");
+  row.className = `msg-row ${msg.role}`;
+  row.id = id;
 
-  fillList(el.resultImportantInfo, data.importantInfo);
-  fillList(el.resultNextSteps, data.nextSteps);
-  fillChecklist(el.resultChecklist, data.checklist);
-}
+  const bubble = document.createElement("div");
+  bubble.className = `msg-bubble ${msg.role}`;
 
-function fillList(ulEl, items) {
-  ulEl.innerHTML = "";
-  if (!items || items.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = "Koi jaankari nahi mili.";
-    ulEl.appendChild(li);
-    return;
-  }
-  items.forEach((text) => {
-    const li = document.createElement("li");
-    li.textContent = text;
-    ulEl.appendChild(li);
-  });
-}
-
-function fillChecklist(ulEl, items) {
-  ulEl.innerHTML = "";
-  if (!items || items.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = "Koi checklist nahi mili.";
-    ulEl.appendChild(li);
-    return;
-  }
-  items.forEach((text, idx) => {
-    const li = document.createElement("li");
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.id = `check-${idx}`;
-
-    const label = document.createElement("label");
-    label.htmlFor = `check-${idx}`;
-    label.textContent = text;
-
-    checkbox.addEventListener("change", () => {
-      label.classList.toggle("checked-label", checkbox.checked);
-    });
-
-    li.appendChild(checkbox);
-    li.appendChild(label);
-    ulEl.appendChild(li);
-  });
-}
-
-function renderResultError(err) {
-  state.lastResult = null;
-  el.resultThumb.src = state.previewDataUrl || "";
-  el.resultDocType.textContent = "";
-  el.resultWhatIsIt.textContent = "—";
-  fillList(el.resultImportantInfo, []);
-  fillList(el.resultNextSteps, []);
-  fillChecklist(el.resultChecklist, []);
-
-  el.resultError.classList.remove("hidden");
-  el.resultError.textContent =
-    "⚠️ Analysis abhi nahi ho paayi. " +
-    (err?.message ? err.message + " " : "") +
-    "Backend AI API connect nahi hai ya server down hai — README dekhein.";
-}
-
-// ============================================================
-// Share / Analyze another
-// ============================================================
-el.shareBtn.addEventListener("click", async () => {
-  if (!state.lastResult) {
-    showToast("Pehle ek document analyze karein.");
-    return;
-  }
-
-  const { documentType, whatIsIt, nextSteps } = state.lastResult;
-  const shareText = [
-    `KaamBatao Result: ${documentType || "Document"}`,
-    ``,
-    `Ye kya hai: ${whatIsIt || "-"}`,
-    ``,
-    `Ab kya karein: ${(nextSteps || []).join(", ")}`,
-  ].join("\n");
-
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: "KaamBatao Result", text: shareText });
-    } catch {
-      /* user cancelled share — do nothing */
+  if (msg.role === "user") {
+    if (msg.fileIsImage && msg.filePreviewUrl) {
+      const img = document.createElement("img");
+      img.src = msg.filePreviewUrl;
+      img.className = "msg-attachment-img";
+      img.alt = "Attached image";
+      bubble.appendChild(img);
+    } else if (msg.fileName) {
+      const fileChip = document.createElement("div");
+      fileChip.className = "msg-attachment-file";
+      fileChip.textContent = `📎 ${msg.fileName}`;
+      bubble.appendChild(fileChip);
     }
-  } else if (navigator.clipboard) {
-    await navigator.clipboard.writeText(shareText);
-    showToast("Result copy ho gaya!");
+    if (msg.text) {
+      const p = document.createElement("p");
+      p.className = "ai-block-text";
+      p.textContent = msg.text;
+      bubble.appendChild(p);
+    }
+  } else if (msg.kind === "analysis") {
+    bubble.appendChild(buildAnalysisContent(msg.data));
+  } else if (msg.kind === "error") {
+    const p = document.createElement("p");
+    p.className = "ai-error-text";
+    p.textContent = `⚠️ ${msg.text}`;
+    bubble.appendChild(p);
   } else {
-    showToast("Sharing is device par support nahi hai.");
+    const p = document.createElement("p");
+    p.className = "ai-block-text";
+    p.textContent = msg.text;
+    bubble.appendChild(p);
   }
-});
 
-el.analyzeAnotherBtn.addEventListener("click", () => {
-  resetUpload();
-  goToScreen("screen-upload");
-});
+  row.appendChild(bubble);
+  el.chatList.appendChild(row);
+  scrollChatToBottom();
+}
+
+function buildAnalysisContent(data) {
+  const wrap = document.createElement("div");
+
+  if (data?.documentType) {
+    const tag = document.createElement("span");
+    tag.className = "ai-doctype-tag";
+    tag.textContent = data.documentType;
+    wrap.appendChild(tag);
+  }
+
+  wrap.appendChild(
+    buildBlock("📄 Ye kya hai?", "text", data?.whatIsIt || "—")
+  );
+  wrap.appendChild(
+    buildBlock("📌 Important baatein", "list", data?.importantInfo || [])
+  );
+  wrap.appendChild(
+    buildBlock("➡️ Ab kya karein?", "list", data?.nextSteps || [])
+  );
+  wrap.appendChild(
+    buildBlock("✅ Checklist", "list", data?.checklist || [])
+  );
+
+  return wrap;
+}
+
+function buildBlock(heading, type, content) {
+  const block = document.createElement("div");
+  block.className = "ai-block";
+
+  const h = document.createElement("h4");
+  h.className = "ai-block-heading";
+  h.textContent = heading;
+  block.appendChild(h);
+
+  if (type === "text") {
+    const p = document.createElement("p");
+    p.className = "ai-block-text";
+    p.textContent = content;
+    block.appendChild(p);
+  } else {
+    const ul = document.createElement("ul");
+    if (!content || content.length === 0) {
+      const li = document.createElement("li");
+      li.textContent = "—";
+      ul.appendChild(li);
+    } else {
+      content.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        ul.appendChild(li);
+      });
+    }
+    block.appendChild(ul);
+  }
+
+  return block;
+}
+
+function addTypingIndicator() {
+  const id = `typing-${++msgCounter}`;
+  const row = document.createElement("div");
+  row.className = "msg-row ai";
+  row.id = id;
+
+  const bubble = document.createElement("div");
+  bubble.className = "msg-bubble ai";
+  bubble.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>`;
+
+  row.appendChild(bubble);
+  el.chatList.appendChild(row);
+  scrollChatToBottom();
+  return id;
+}
+
+function removeTypingIndicator(id) {
+  const rowEl = document.getElementById(id);
+  if (rowEl) rowEl.remove();
+}
+
+function scrollChatToBottom() {
+  requestAnimationFrame(() => {
+    el.mainScroll.scrollTop = el.mainScroll.scrollHeight;
+  });
+}
 
 // ============================================================
 // Toast helper
